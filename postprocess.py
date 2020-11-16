@@ -30,7 +30,7 @@ def get_minmax(filein,fileout):
         #Split lines by ","
         aline=line.split(',')[:-1]
         
-        #   Protect against empty columns
+        #Protect against empty columns
         if len(aline)!=7:
             continue
         
@@ -117,13 +117,16 @@ def detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size=5):
             nl_std=np.std(x[6])
 
             #Mean pl and nl then compare
+            #print('Standard deviation')
             #print(np.mean((pl_std,nl_std))) #debug
-            if np.mean((pl_std,nl_std))<min_std:
+            if pl_std<min_std and nl_std<min_std:
 
                 #Now check if the load is within tolerance margin
                 pl_mean=abs(np.mean(x[5]))
                 nl_mean=abs(np.mean(x[6]))
-                #print(eLoad-np.mean((pl_mean,nl_mean))) #debug
+                #print('Load check')
+                #print(abs(eLoad-np.mean((pl_mean,nl_mean)))*100) #debug
+                #print(eLoad*eLoadTol)
                 if abs(eLoad-np.mean((pl_mean,nl_mean)))<(eLoad*eLoadTol/100):
 
                     #Found it, now stop the search and return the current pointer
@@ -191,8 +194,29 @@ def find_disp(filein,ple_pointer,disp):
             return lfpointer
         
         #Check negative displacement
-        if abs(aline[4]-ref[4])/ref[4]*100>disp:
+        if abs((aline[4]-ref[4])/ref[4])*100>disp:
             return lfpointer
+
+def postprocess(path_in,tmp,eLoad,eLoadTol,min_std,buffer_size=5):
+    with open(path_in,'r') as filein:
+        with open(tmp,'w') as fileout:
+            #Averaging all data points belonging to the same cycle
+            get_minmax(filein,fileout)
+
+    with open(tmp,'r') as filein:
+        result=[]
+        #Detect pre-load cycles
+        ple_pointer=detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size)
+        #Move file pointer to ple_pointer
+        filein.seek(ple_pointer,0)
+        result.append(filein.readline())
+        #Find yield point
+        find_disp(filein,ple_pointer,10)
+        result.append(filein.readline())
+        #Find breaking point
+        find_disp(filein,ple_pointer,30)
+        result.append(filein.readline())
+    return(result)
 
 if __name__=='__main__':
     #Argument parser
@@ -211,6 +235,7 @@ if __name__=='__main__':
     args=parser.parse_args()
     
     #Config files
+    #path_in='3PF_0F_A 10082020 065303_pvd.CSV'
     path_in=args.input
     tmp=args.tmp
     eLoad=args.load #expected load
@@ -238,3 +263,4 @@ if __name__=='__main__':
         find_disp(filein,ple_pointer,30)
         print('Breaking point (30% disp)')
         print(filein.readline()) #debug
+
