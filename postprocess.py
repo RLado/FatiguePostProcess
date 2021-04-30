@@ -144,7 +144,7 @@ def detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size=5):
     else:
         return buffer_p[0] #ple_pointer
 
-def find_disp(filein,ple_pointer,disp):
+def find_disp(filein,ple_pointer,disp=10,npointsbuf=25):
     '''
     Find the file pointer pointing to the first register that exceeds disp% 
     displacement compared to the end of the preload value.
@@ -155,8 +155,9 @@ def find_disp(filein,ple_pointer,disp):
 
         ple_pointer (integer): File pointer to the end of the pre-load phase
 
-        disp (float): Displacement percentage to find with respect to the end of 
-        the preload value
+        disp (float): Displacement percentage that increases by more than disp%  (Default: 10)
+
+        npointsbuf (int): Number of points to average for slope calculation (Default: 25)
     
     Returns:
         df_pointer (integer): Pointer pointing to the first register that exceeds 
@@ -168,9 +169,10 @@ def find_disp(filein,ple_pointer,disp):
     filein.seek(ple_pointer,0)
 
     lfpointer=-1
-    ref=filein.readline().split(',')
-    for i in range(len(ref)):
-        ref[i]=float(ref[i].strip('\n'))
+    
+    #Slope buffer
+    sbufp=[]
+    sbufn=[]
 
     while filein.tell()!=lfpointer:
         lfpointer=filein.tell()
@@ -189,12 +191,34 @@ def find_disp(filein,ple_pointer,disp):
         except ValueError:
             continue
         
+        #Fill slope buffer
+        sbufp.append(aline[3])
+        sbufn.append(aline[4])
+        if len(sbufp) >= 2*npointsbuf+1:
+            sbufp.pop(0)
+            sbufn.pop(0)
+        else:
+            continue
+        
+        #Average calculation
+        print('hola')      
+        ap=sum(sbufp[:npointsbuf])/npointsbuf
+        bp=sum(sbufp[npointsbuf:2*npointsbuf])/npointsbuf
+        
+        an=sum(sbufn[:npointsbuf])/npointsbuf
+        bn=sum(sbufn[npointsbuf:2*npointsbuf])/npointsbuf
+        
+        #Deviation calculation
+        dabp=bp/ap-1
+
+        dabn=bn/an+1
+
         #Check positive displacement
-        if abs(aline[3]-ref[3])/ref[3]*100>disp:
+        if dabp*100>disp:
             return lfpointer
         
         #Check negative displacement
-        if abs((aline[4]-ref[4])/ref[4])*100>disp:
+        if dabn*100<-disp:
             return lfpointer
 
 def postprocess(path_in,tmp,eLoad,eLoadTol,min_std,buffer_size=5):

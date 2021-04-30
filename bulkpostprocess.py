@@ -48,7 +48,7 @@ results = pd.DataFrame(columns=column_names)
 for i in range(len(names)): # range creates iterable object
     index = loadName.index(names[i].split(" ")[0]) # find the name that is being evaluated and return target load from load files
     output = pp.postprocess(os.path.join(entry_file_path,names[i]+'.csv'),os.path.join(script_dir, 'temporary.txt'),
-    float(load[index].split(" ")[1]),0.02,0.1,5) #0.01 and 0.05 for all files
+    float(load[index].split(" ")[1]),0.01,0.05,5) #0.01 and 0.05 for all files
     # print(load[index].split(" ")[1]) # debug
     print('aqui' , output)
     preLoadData = list(map(float, output[0].split(",")))[0:2] # get first and second value
