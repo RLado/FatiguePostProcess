@@ -200,8 +200,7 @@ def find_disp(filein,ple_pointer,disp=10,npointsbuf=25):
         else:
             continue
         
-        #Average calculation
-        print('hola')      
+        #Average calculation     
         ap=sum(sbufp[:npointsbuf])/npointsbuf
         bp=sum(sbufp[npointsbuf:2*npointsbuf])/npointsbuf
         
@@ -236,9 +235,6 @@ def postprocess(path_in,tmp,eLoad,eLoadTol,min_std,buffer_size=5):
         result.append(filein.readline())
         #Find yield point
         find_disp(filein,ple_pointer,10)
-        result.append(filein.readline())
-        #Find breaking point
-        find_disp(filein,ple_pointer,30)
         result.append(filein.readline())
     return(result)
 
@@ -282,9 +278,5 @@ if __name__=='__main__':
         #Find yield point
         find_disp(filein,ple_pointer,10)
         print('Yield point (10% disp)')
-        print(filein.readline()) #debug
-        #Find breaking point
-        find_disp(filein,ple_pointer,30)
-        print('Breaking point (30% disp)')
         print(filein.readline()) #debug
 
