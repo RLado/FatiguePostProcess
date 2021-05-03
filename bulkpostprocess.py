@@ -2,7 +2,8 @@ import os
 import pandas as pd
 import numpy as np
 import postprocess as pp
-
+import matplotlib
+from matplotlib import pyplot as plt
 ### Punts a tenir en compte:
 #   La funció postprocess i bulkpostprocess han d'estar a la mateixa carpeta que la carpeta amb fitxers d'entrada.
 #   El fitxer de LOADS.txt ha de contenir una columna amb noms de provetes i, separat per espai, la càrrega objectiu. 
@@ -41,7 +42,7 @@ loadName = loadName[0::2] # get the elements in the even position. start at the 
 # print(loadName) # debug
 
 # CREATE HEADERS IN RESULTS TABLE
-column_names = ["specimen", "timePL", "cyclesPL", "timeYP", "cyclesYP", "timeBP", "cyclesBP"]
+column_names = ["specimen", "timePL", "cyclesPL", "timeYP", "cyclesYP"]
 results = pd.DataFrame(columns=column_names)
 
 # CALL POSTPROCESS FUNCTION AND FILL IN RESULTS TABLE
@@ -49,8 +50,7 @@ for i in range(len(names)): # range creates iterable object
     index = loadName.index(names[i].split(" ")[0]) # find the name that is being evaluated and return target load from load files
     output = pp.postprocess(os.path.join(entry_file_path,names[i]+'.csv'),os.path.join(script_dir, 'temporary.txt'),
     float(load[index].split(" ")[1]),0.01,0.05,5) #0.01 and 0.05 for all files
-    # print(load[index].split(" ")[1]) # debug
-    print('aqui' , output)
+    print('aqui', output)
     preLoadData = list(map(float, output[0].split(",")))[0:2] # get first and second value
     yieldPointData = []
     for j in output[1].split(","):
@@ -60,20 +60,35 @@ for i in range(len(names)): # range creates iterable object
         else: 
             yieldPointData.append(float(j))
     yieldPointData = yieldPointData[0:2]
-    breakingPointData = []
-    for j in output[2].split(","):
-        if j == '':
-            breakingPointData.append('not found')
-            breakingPointData.append('not found')
-        else: 
-            breakingPointData.append(float(j))
-    breakingPointData = breakingPointData[0:2]
     row = [names[i].split(" ")[0]] # extract name until the first blank space
     row.extend(preLoadData) # extend te alarga la lista
     row.extend(yieldPointData)
-    row.extend(breakingPointData)
     row = pd.Series(row, index=results.columns)
     results = results.append(row, ignore_index=True) # append te va añadiendo lo siguiente a nueva línea
+
+    # Plot temporary data
+    data = [i.strip('\n').split(',') for i in open('temporary.txt')]
+    dataarray = np.array(data)
+    x = dataarray[:, 1]
+    yp = dataarray[:, 3]
+    yn = dataarray[:, 4]
+    
+    print('xy data')
+    print(x)
+    print(yp)
+    print(yn)
+    
+    fig = plt.figure()
+    plt.plot(x, yp, label = '+ displacement')
+    plt.plot(x, yn, label = '- displacement')
+    plt.xlabel('Cycles')
+    plt.ylabel('Displacement (mm)')
+    plt.title(names[i].split('')[0])
+    
+    plt.show()
+    
+    fig.savefig(script_dir + f'/Figures/{names[i].split('')[0]}.png', dpi=300) #dpi = 300 gives better resolution
+    plt.close(fig)
 
 print(results)
 results.to_csv(os.path.join(script_dir, 'results.csv'))
