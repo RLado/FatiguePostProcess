@@ -61,6 +61,61 @@ def get_minmax(filein,fileout):
         #Update cycle
         cycle=aline[1]
 
+def filter_disp(filein, fileout, ple_pointer, max_diff):
+    '''
+    Filter data file by checking if two adjacent points of data differ by too 
+    big of a difference.
+
+    Arguments:
+        filein (file descriptor): Read enabled file descriptor pointing to the 
+        CSV to be processed
+
+        fileout (file descriptor): Write enabled file descriptor to output the 
+        results to
+
+        ple_pointer (integer): File pointer to the end of the pre-load phase
+
+        max_diff (float): Maximum difference between two adjacent points of data
+        in percentage
+
+    Returns:
+        None
+
+    '''
+
+    filein.seek(ple_pointer, 0)
+
+    lfpointer =- 1
+    laline = None
+
+    while filein.tell()!=lfpointer:
+        lfpointer=filein.tell()
+        line=filein.readline()
+        
+        #Split lines by ","
+        aline=line.split(',')
+
+        #Protect against empty columns
+        if len(aline)!=7:
+            continue
+        
+        #Convert strings into floating point values
+        try:
+            for i in range(len(aline)):
+                aline[i]=float(aline[i].strip(' '))
+        except ValueError:
+            continue
+
+        if laline == None:
+            laline = aline
+            continue
+
+        if abs((aline[3]-laline[3])/laline[3])*100 > max_diff or abs((aline[4]-laline[4])/laline[4])*100 > max_diff:
+            continue
+        else:
+            fileout.write(','.join(str(strline) for strline in aline)+'\n')
+            laline = aline   
+        
 def detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size=5):
     '''
     Detects preload state ending and returns a file pointer. This function first
@@ -144,25 +199,20 @@ def detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size=5):
     else:
         return buffer_p[0] #ple_pointer
 
-def find_disp(filein,ple_pointer,disp=10,npointsbuf=25):
+def find_disp(filein,ple_pointer,disp):
     '''
     Find the file pointer pointing to the first register that exceeds disp% 
     displacement compared to the end of the preload value.
-
     Arguments:
         filein (file descriptor): Read enabled file descriptor pointing to the 
         get_minmax function result
-
         ple_pointer (integer): File pointer to the end of the pre-load phase
-
-        disp (float): Displacement percentage that increases by more than disp%  (Default: 10)
-
-        npointsbuf (int): Number of points to average for slope calculation (Default: 25)
+        disp (float): Displacement percentage to find with respect to the end of 
+        the preload value
     
     Returns:
         df_pointer (integer): Pointer pointing to the first register that exceeds 
         disp% displacement compared to the end of the preload value
-
     '''
 
     #Place the file pointer at the end of the pre-load phase
@@ -170,9 +220,9 @@ def find_disp(filein,ple_pointer,disp=10,npointsbuf=25):
 
     lfpointer=-1
     
-    #Slope buffer
-    sbufp=[]
-    sbufn=[]
+    ref=filein.readline().split(',')
+    for i in range(len(ref)):
+        ref[i]=float(ref[i].strip('\n'))
 
     while filein.tell()!=lfpointer:
         lfpointer=filein.tell()
@@ -190,52 +240,40 @@ def find_disp(filein,ple_pointer,disp=10,npointsbuf=25):
                 aline[i]=float(aline[i].strip('\n'))
         except ValueError:
             continue
-        
-        #Fill slope buffer
-        sbufp.append(aline[3])
-        sbufn.append(aline[4])
-        if len(sbufp) >= 2*npointsbuf+1:
-            sbufp.pop(0)
-            sbufn.pop(0)
-        else:
-            continue
-        
-        #Average calculation     
-        ap=sum(sbufp[:npointsbuf])/npointsbuf
-        bp=sum(sbufp[npointsbuf:2*npointsbuf])/npointsbuf
-        
-        an=sum(sbufn[:npointsbuf])/npointsbuf
-        bn=sum(sbufn[npointsbuf:2*npointsbuf])/npointsbuf
-        
-        #Deviation calculation
-        dabp=bp/ap-1
-
-        dabn=bn/an+1
 
         #Check positive displacement
-        if dabp*100>disp:
+        if abs(aline[3]-ref[3])/ref[3]*100>disp:
             return lfpointer
         
         #Check negative displacement
-        if dabn*100<-disp:
+        if abs((aline[4]-ref[4])/ref[4])*100>disp:
             return lfpointer
 
 def postprocess(path_in,tmp,eLoad,eLoadTol,min_std,buffer_size=5):
+    result=[]
+
     with open(path_in,'r') as filein:
         with open(tmp,'w') as fileout:
             #Averaging all data points belonging to the same cycle
             get_minmax(filein,fileout)
-
+    
     with open(tmp,'r') as filein:
-        result=[]
         #Detect pre-load cycles
         ple_pointer=detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size)
+        
         #Move file pointer to ple_pointer
         filein.seek(ple_pointer,0)
         result.append(filein.readline())
+
+        #Filter data
+        with open(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1], 'w') as fileout:
+            filter_disp(filein, fileout, ple_pointer, 50)
+    
+    with open(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1], 'r') as filein:        
         #Find yield point
-        find_disp(filein,ple_pointer,10)
+        find_disp(filein,0,10)
         result.append(filein.readline())
+
     return(result)
 
 if __name__=='__main__':
@@ -267,16 +305,22 @@ if __name__=='__main__':
         with open(tmp,'w') as fileout:
             #Averaging all data points belonging to the same cycle
             get_minmax(filein,fileout)
-
+    
     with open(tmp,'r') as filein:
         #Detect pre-load cycles
         ple_pointer=detect_preload(filein,eLoad,eLoadTol,min_std,buffer_size)
+        
         #Move file pointer to ple_pointer
         filein.seek(ple_pointer,0)
         print('End of preload')
         print(filein.readline()) #debug
+
+        #Filter data
+        with open(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1], 'w') as fileout:
+            filter_disp(filein, fileout, ple_pointer, 50)
+    
+    with open(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1], 'r') as filein:        
         #Find yield point
-        find_disp(filein,ple_pointer,10)
+        find_disp(filein,0,10)
         print('Yield point (10% disp)')
         print(filein.readline()) #debug
-
