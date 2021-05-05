@@ -266,6 +266,10 @@ def postprocess(path_in,tmp,eLoad,eLoadTol,min_std,buffer_size=5):
         result.append(filein.readline())
 
         #Filter data
+        print('*****aqui')
+        print(tmp)
+        print(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1])
+
         with open(tmp.split('.')[0] + '_filtered.' + tmp.split('.')[1], 'w') as fileout:
             filter_disp(filein, fileout, ple_pointer, 50)
     

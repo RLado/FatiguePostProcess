@@ -48,7 +48,7 @@ results = pd.DataFrame(columns=column_names)
 # CALL POSTPROCESS FUNCTION AND FILL IN RESULTS TABLE
 for i in range(len(names)): # range creates iterable object
     index = loadName.index(names[i].split(" ")[0]) # find the name that is being evaluated and return target load from load files
-    output = pp.postprocess(os.path.join(entry_file_path,names[i]+'.csv'),os.path.join(script_dir, 'temporary.txt'),
+    output = pp.postprocess(os.path.join(entry_file_path,names[i]+'.csv'),os.path.join(script_dir, 'temporary.csv'),
     float(load[index].split(" ")[1]),0.01,0.05,5) #0.01 and 0.05 for all files
     print('aqui', output)
     preLoadData = list(map(float, output[0].split(",")))[0:2] # get first and second value
@@ -67,27 +67,27 @@ for i in range(len(names)): # range creates iterable object
     results = results.append(row, ignore_index=True) # append te va añadiendo lo siguiente a nueva línea
 
     # Plot temporary data
-    data = [i.strip('\n').split(',') for i in open('temporary.txt')]
-    dataarray = np.array(data)
-    x = dataarray[:, 1]
-    yp = dataarray[:, 3]
-    yn = dataarray[:, 4]
+    with open('temporary.csv','r') as data: 
+        data = data.read().split('\n')
+        del data[-1]
+        for k in range(len(data)):
+            data[k] = data[k].split(',')
+            for l in range(len(data[k])):
+                data[k][l] = float(data[k][l])
     
-    print('xy data')
-    print(x)
-    print(yp)
-    print(yn)
+    dataarray = tuple(zip(*data))
+    x = dataarray[1]
+    yp = dataarray[3]
+    yn = dataarray[4]
     
     fig = plt.figure()
     plt.plot(x, yp, label = '+ displacement')
     plt.plot(x, yn, label = '- displacement')
     plt.xlabel('Cycles')
     plt.ylabel('Displacement (mm)')
-    plt.title(names[i].split('')[0])
+    plt.title(names[i].split(" ")[0])
     
-    plt.show()
-    
-    fig.savefig(script_dir + f'/Figures/{names[i].split('')[0]}.png', dpi=300) #dpi = 300 gives better resolution
+    fig.savefig(script_dir + f'/Figures/{names[i].split(" ")[0]}.png', dpi=300) #dpi = 300 gives better resolution
     plt.close(fig)
 
 print(results)
